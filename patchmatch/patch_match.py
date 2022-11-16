@@ -7,10 +7,13 @@
 #
 # Distributed under terms of the MIT license.
 
+# Additional modifications by Kyle Schouviller
+
+
 import ctypes
 import os.path as osp
 from typing import Optional, Union
-
+import os
 import numpy as np
 from PIL import Image
 
@@ -21,14 +24,6 @@ patchmatch_available = False
 repo = 'https://api.github.com/repos/invoke-ai/PyPatchMatch/'
 release_id = '83203735'
 release_url = f'{repo}releases/{release_id}'
-
-import os
-# if os.name!="nt":
-#     # Otherwise, fall back to the subprocess.
-#     import subprocess
-#     print('Compiling and loading c extensions from "{}".'.format(osp.realpath(osp.dirname(__file__))))
-#     # subprocess.check_call(['./travis.sh'], cwd=osp.dirname(__file__))
-#     subprocess.check_call("make clean && make", cwd=osp.dirname(__file__), shell=True)
 
 
 __all__ = ['set_random_seed', 'set_verbose', 'inpaint', 'inpaint_regularity']
