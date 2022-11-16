@@ -14,14 +14,18 @@ from typing import Optional, Union
 import numpy as np
 from PIL import Image
 
+# The GitHub release information
+repo = 'https://api.github.com/repos/invoke-ai/PyPatchMatch/'
+release_id = '83203735'
+release_url = f'{repo}releases/{release_id}'
 
 import os
-if os.name!="nt":
-    # Otherwise, fall back to the subprocess.
-    import subprocess
-    print('Compiling and loading c extensions from "{}".'.format(osp.realpath(osp.dirname(__file__))))
-    # subprocess.check_call(['./travis.sh'], cwd=osp.dirname(__file__))
-    subprocess.check_call("make clean && make", cwd=osp.dirname(__file__), shell=True)
+# if os.name!="nt":
+#     # Otherwise, fall back to the subprocess.
+#     import subprocess
+#     print('Compiling and loading c extensions from "{}".'.format(osp.realpath(osp.dirname(__file__))))
+#     # subprocess.check_call(['./travis.sh'], cwd=osp.dirname(__file__))
+#     subprocess.check_call("make clean && make", cwd=osp.dirname(__file__), shell=True)
 
 
 __all__ = ['set_random_seed', 'set_verbose', 'inpaint', 'inpaint_regularity']
@@ -95,18 +99,57 @@ def download_url_to_file(url, dst, hash_prefix=None, progress=True):
         if os.path.exists(f.name):
             os.remove(f.name)
 
-if os.name!="nt":
-    PMLIB = ctypes.CDLL(osp.join(osp.dirname(__file__), 'libpatchmatch.so'))
-else:
-    if not os.path.exists(osp.join(osp.dirname(__file__), 'libpatchmatch.dll')):
-        download_url_to_file(url="https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/libpatchmatch.dll",dst=osp.join(osp.dirname(__file__), 'libpatchmatch.dll'))
-    if not os.path.exists(osp.join(osp.dirname(__file__), 'opencv_world460.dll')):
-        download_url_to_file(url="https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/opencv_world460.dll",dst=osp.join(osp.dirname(__file__), 'opencv_world460.dll'))
-    if not os.path.exists(osp.join(osp.dirname(__file__), 'libpatchmatch.dll')):
-        print("[Dependency Missing] Please download https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/libpatchmatch.dll and put it into the PyPatchMatch folder")
-    if not os.path.exists(osp.join(osp.dirname(__file__), 'opencv_world460.dll')):
-        print("[Dependency Missing] Please download https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/opencv_world460.dll and put it into the PyPatchMatch folder")
-    PMLIB = ctypes.CDLL(osp.join(osp.dirname(__file__), 'libpatchmatch.dll'))
+import json
+import platform
+
+# Get release information from github
+release_response = urlopen(release_url)
+release_json = json.loads(release_response.read())
+
+# Filter to assets for platform
+platform_slug = f'{platform.system().lower()}_{platform.machine().lower()}'
+platform_assets = list(filter(lambda a: platform_slug in a['name'], release_json['assets']))
+if 'windows' in platform_slug:
+    platform_assets.extend(filter(lambda a: a['name'] == 'opencv_world460.dll', release_json['assets']))
+
+# Get assets
+pypatchmatch_lib = None
+for asset in platform_assets:
+    lib_name = asset['name']
+    lib_url = asset['browser_download_url']
+
+    if not os.path.exists(osp.join(osp.dirname(__file__), lib_name)):
+        download_url_to_file(url=lib_url, dst=osp.join(osp.dirname(__file__), lib_name))
+
+    # Store patchmatch library name
+    if lib_name.startswith('libpatchmatch_'):
+        pypatchmatch_lib = lib_name
+
+
+# Compile if we didn't find a platform-compatible version (and it's not compiled already)
+if pypatchmatch_lib is None:
+    pypatchmatch_lib = 'libpatchmatch.so'
+    if not os.path.exists(osp.join(osp.dirname(__file__), pypatchmatch_lib)):
+        import subprocess
+        print('Compiling and loading c extensions from "{}".'.format(osp.realpath(osp.dirname(__file__))))
+        # subprocess.check_call(['./travis.sh'], cwd=osp.dirname(__file__))
+        subprocess.check_call("make clean && make", cwd=osp.dirname(__file__), shell=True)
+
+PMLIB = ctypes.CDLL(osp.join(osp.dirname(__file__), pypatchmatch_lib))
+
+
+# if os.name!="nt":
+#     PMLIB = ctypes.CDLL(osp.join(osp.dirname(__file__), 'libpatchmatch.so'))
+# else:
+#     if not os.path.exists(osp.join(osp.dirname(__file__), 'libpatchmatch.dll')):
+#         download_url_to_file(url="https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/libpatchmatch.dll",dst=osp.join(osp.dirname(__file__), 'libpatchmatch.dll'))
+#     if not os.path.exists(osp.join(osp.dirname(__file__), 'opencv_world460.dll')):
+#         download_url_to_file(url="https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/opencv_world460.dll",dst=osp.join(osp.dirname(__file__), 'opencv_world460.dll'))
+#     if not os.path.exists(osp.join(osp.dirname(__file__), 'libpatchmatch.dll')):
+#         print("[Dependency Missing] Please download https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/libpatchmatch.dll and put it into the PyPatchMatch folder")
+#     if not os.path.exists(osp.join(osp.dirname(__file__), 'opencv_world460.dll')):
+#         print("[Dependency Missing] Please download https://github.com/lkwq007/PyPatchMatch/releases/download/v0.1/opencv_world460.dll and put it into the PyPatchMatch folder")
+#     PMLIB = ctypes.CDLL(osp.join(osp.dirname(__file__), 'libpatchmatch.dll'))
 
 PMLIB.PM_set_random_seed.argtypes = [ctypes.c_uint]
 PMLIB.PM_set_verbose.argtypes = [ctypes.c_int]
